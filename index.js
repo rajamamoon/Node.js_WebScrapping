@@ -9,28 +9,30 @@ var sleep = require('sleep');
 var arr = [];
 var isbncount = 0;
 
-fs.createReadStream("data1.csv")
+async function readCVS(){
+  fs.createReadStream("data1.csv")
   .pipe(csv())
   .on("data", (row) => {
     isbncount++
     console.log(row.isbn);
     var isbn = row.isbn;
     const url = "https://www.bookdepository.com/search?searchTerm="+isbn+"&search=Find+book"
-    bookdepository(url);
+    return bookdepository(url, isbn);
   })
   .on("end", () => {
     console.log("Total ISBN" + " "+ isbncount);
     console.log("ISBN file successfully processed");
   });
 
-function bookdepository(url){
+}
+
+async function bookdepository(url , isbn){
+  let obj = {};
+  console.log(url)
     axios.get(url).then((response) => {
-        console.log(url)
         // Load the web page source code into a cheerio instance
         const $ = cheerio.load(response.data)
       
-        // The pre.highlight.shell CSS selector matches all `pre` elements
-        // that have both the `highlight` and `shell` class
         const titleElems = $("*[itemprop = 'name']")[0]
         const authorElems = $("*[itemprop = 'name']")[1]
         const descriptionElems = $("*[itemprop = 'description']")[0]
@@ -40,8 +42,8 @@ function bookdepository(url){
         const publishElems =  $("*[itemprop = 'datePublished']")[0]
         const publisherElems =  $("*[itemprop = 'name']")[2]
         const imprintElems =  $("ul.biblio-info li ")[4]
-        const typeElems =  $("ul.biblio-info li ")[4]
-        const isbnElems =  $("ul.biblio-info li ")[8]
+        const typeElems =  $("ul.biblio-info li span")[0]
+        const isbnElems =  $("*[itemprop = 'isbn']")
         var titlecontent = $(titleElems).text().trim();
         var authorcontent = $(authorElems).text().trim();
         var descriptioncontent = $(descriptionElems).text().trim().replace(/^\s+|\s+$/gm,'');
@@ -51,8 +53,43 @@ function bookdepository(url){
         var publishcontent = $(publishElems).text().trim();
         var publishercontent = $(publisherElems).text().trim();
         var imprintcontent = $(imprintElems).text().trim().substring(7).replace(/^\s+|\s+$/gm,'');
-        var typecontent = $(typeElems).text().trim().substring(7).replace(/^\s+|\s+$/gm,'');
-        var isbncontent = $(isbnElems).text().trim().substring(7).replace(/^\s+|\s+$/gm,'');
+        if (imprintcontent.includes("Publication City/Country")){
+          console.log("test")
+          obj["Publication City/Country"] = imprintcontent;
+          obj["Imprint"] = " ";
+        }
+        else{
+          obj["Publication City/Country"] = "No information";
+          obj["Imprint"] = imprintcontent;
+          console.log("test2")
+        }
+        var typecontent = $(typeElems).text().trim().substring(0,10).replace(/^\s+|\s+$/gm,'');
+        var isbncontent = $(isbnElems).text().trim();
+        
+        obj["ISBN"] = isbn;
+        obj["Author"] = authorcontent;
+        obj["Title"] = titlecontent;
+        obj["Description"] = descriptioncontent;
+        obj["Language"] = languagecontent;
+        obj["Category"] = categorycontent;
+        obj["Pages"] = pagecontent;
+        obj["Published Date"] = publishcontent;
+        obj["Publisher"] = publishercontent;
+        obj["Type"] = typecontent;
+        obj["ISBN-13"] = isbncontent;
+
+
+        arr.push(obj)
+
+        // stringify(arr, { header: true }, (err, output) => {
+        //   if (err) throw err;
+        //   fs.writeFile("out.csv", output, (err) => {
+        //     if (err) throw err;
+        //      return ("Details Saved For " + isbn);
+        //   });
+        // });
+
+        
         console.log("Title:- " + titlecontent);
         console.log("Author:- "+authorcontent)
         console.log("Description:- "+ descriptioncontent) 
@@ -62,7 +99,12 @@ function bookdepository(url){
         console.log("Published date:- "+ publishcontent)
         console.log("Publisher:- "+ publishercontent)
         console.log("Imprint:- "+ imprintcontent)
+        console.log("Publication City/Country:- "+ imprintcontent)
         console.log("Type:- "+ typecontent)
         console.log("ISBN:- "+ isbncontent)
       })
 }
+
+(async() => {
+  await readCVS();
+})();
