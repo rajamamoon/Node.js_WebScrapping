@@ -1,49 +1,64 @@
 const cheerio = require('cheerio')
 const axios = require('axios')
-const https = require("https");
 const csv = require("csv-parser");
 const fs = require("fs");
-var stringify = require("csv-stringify");
-var sleep = require('sleep');
+const xlsl = require("xlsx");
 
 var arr = [];
 var isbncount = 0;
 
-async function readCVS(){
-  fs.createReadStream("data1.csv")
-  .pipe(csv())
-  .on("data", (row) => {
-    isbncount++
-    console.log(row.isbn);
-    var isbn = row.isbn;
-    const url = "https://www.bookdepository.com/search?searchTerm="+isbn+"&search=Find+book"
-    return bookdepository(url, isbn);
-  })
-  .on("end", () => {
-    console.log("Total ISBN" + " "+ isbncount);
-    console.log("ISBN file successfully processed");
-  });
+(async() => {
+    fs.createReadStream("data1.csv")
+    .pipe(csv())
+    .on("data", (row) => {
+      
+      isbncount++
+      console.log(row.isbn);
+      var isbn = row.isbn;
 
-}
+      const url = "https://www.bookdepository.com/search?searchTerm="+isbn+"&search=Find+book"
+      const resultData = bookdepository(url, isbn);
+      
+      var arrayData = resultData.then(function (result){
+        arr.push(result);
+        return arr
+      })
+
+      arrayData.then( function (arrayResult){
+        const wb = xlsl.utils.book_new();
+        const ws = xlsl.utils.json_to_sheet(arrayResult);
+        xlsl.utils.book_append_sheet(wb,ws);
+        xlsl.writeFile(wb,"links.xlsx");
+      })
+
+    })
+    .on("end", () => {
+      console.log("Total ISBN" + " "+ isbncount);
+      console.log("ISBN file successfully processed");
+    });
+})();
 
 async function bookdepository(url , isbn){
   let obj = {};
-  console.log(url)
-    axios.get(url).then((response) => {
+
+  const objectReturn =  await axios.get(url).then((response) => {
         // Load the web page source code into a cheerio instance
         const $ = cheerio.load(response.data)
-      
+
         const titleElems = $("*[itemprop = 'name']")[0]
-        const authorElems = $("*[itemprop = 'name']")[1]
-        const descriptionElems = $("*[itemprop = 'description']")[0]
-        const lanaguageElems = $("*[itemprop = 'inLanguage']")[0]
+        const authorElems = $("*[itemprop = 'author']")
+        const descriptionElems = $("*[itemprop = 'description']")
+        const lanaguageElems = $("*[itemprop = 'inLanguage']")
         const categoryElems =  $('ol.breadcrumb a')[0]
         const pageElems =  $("*[itemprop = 'numberOfPages']")[0]
-        const publishElems =  $("*[itemprop = 'datePublished']")[0]
-        const publisherElems =  $("*[itemprop = 'name']")[2]
+        const publishElems =  $("*[itemprop = 'datePublished']")
+        const publisherElems =  $("*[itemprop = 'publisher']")
         const imprintElems =  $("ul.biblio-info li ")[4]
         const typeElems =  $("ul.biblio-info li span")[0]
+        const originElems =  $("ul.biblio-info li")[4]
         const isbnElems =  $("*[itemprop = 'isbn']")
+        const imageElems =  $(".item-img-content")
+
         var titlecontent = $(titleElems).text().trim();
         var authorcontent = $(authorElems).text().trim();
         var descriptioncontent = $(descriptionElems).text().trim().replace(/^\s+|\s+$/gm,'');
@@ -52,19 +67,21 @@ async function bookdepository(url , isbn){
         var pagecontent = $(pageElems).text().trim();
         var publishcontent = $(publishElems).text().trim();
         var publishercontent = $(publisherElems).text().trim();
-        var imprintcontent = $(imprintElems).text().trim().substring(7).replace(/^\s+|\s+$/gm,'');
-        if (imprintcontent.includes("Publication City/Country")){
-          console.log("test")
-          obj["Publication City/Country"] = imprintcontent;
-          obj["Imprint"] = " ";
-        }
-        else{
-          obj["Publication City/Country"] = "No information";
-          obj["Imprint"] = imprintcontent;
-          console.log("test2")
+        var imagecontent = $(imageElems).find('img').attr('src');
+        
+        if($(imprintElems).text().trim().includes("Imprint")){
+          var imprintcontent = $(imprintElems).text().trim().substring(7).replace(/^\s+|\s+$/gm,'');
+        } else{
+          var imprintcontent = "No information"
         }
         var typecontent = $(typeElems).text().trim().substring(0,10).replace(/^\s+|\s+$/gm,'');
         var isbncontent = $(isbnElems).text().trim();
+        if($(originElems).text().trim().includes("Publication City/Country")){
+          var origincontent = $(originElems).text().trim().substring(26).replace(/^\s+|\s+$/gm,'');
+        } else{
+          const originElems =  $("ul.biblio-info li")[5]
+          var origincontent = $(originElems).text().trim().substring(26).replace(/^\s+|\s+$/gm,'');
+        }
         
         obj["ISBN"] = isbn;
         obj["Author"] = authorcontent;
@@ -77,21 +94,12 @@ async function bookdepository(url , isbn){
         obj["Publisher"] = publishercontent;
         obj["Type"] = typecontent;
         obj["ISBN-13"] = isbncontent;
+        obj["Publication City/Country"] = origincontent;
+        obj["Imprint"] = imprintcontent;
+        obj["Image"] = imagecontent;
 
-
-        arr.push(obj)
-
-        // stringify(arr, { header: true }, (err, output) => {
-        //   if (err) throw err;
-        //   fs.writeFile("out.csv", output, (err) => {
-        //     if (err) throw err;
-        //      return ("Details Saved For " + isbn);
-        //   });
-        // });
-
-        
         console.log("Title:- " + titlecontent);
-        console.log("Author:- "+authorcontent)
+        console.log("Author:- "+ authorcontent)
         console.log("Description:- "+ descriptioncontent) 
         console.log("Language:- " + languagecontent)
         console.log("Category:- " + categorycontent)
@@ -99,12 +107,12 @@ async function bookdepository(url , isbn){
         console.log("Published date:- "+ publishcontent)
         console.log("Publisher:- "+ publishercontent)
         console.log("Imprint:- "+ imprintcontent)
-        console.log("Publication City/Country:- "+ imprintcontent)
+        console.log("Publication City/Country:- "+ origincontent)
         console.log("Type:- "+ typecontent)
         console.log("ISBN:- "+ isbncontent)
-      })
-}
+        console.log("Image:- "+ imagecontent)
 
-(async() => {
-  await readCVS();
-})();
+        return obj;
+      })
+      return objectReturn;
+}
