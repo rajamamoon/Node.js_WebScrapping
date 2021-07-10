@@ -1,5 +1,5 @@
 # Node.js_WebScrapping
-A simple and basic Web scrapper using node.js. 
+A simple and basic Web scrapper using node.js that uses axios and cheerio to retrieve, load the html, scrap the content and save it into an excel sheet 
 ## Libraries
 * Cheerio
 * Axios
