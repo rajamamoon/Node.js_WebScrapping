@@ -5,6 +5,7 @@ A simple and basic Web scrapper using node.js.
 * Axios
 * csv-parser
 * fs
+* xlsx
 
 ### Installation
 
@@ -35,6 +36,7 @@ A simple and basic Web scrapper using node.js.
         Publication City/Country
         Type
         ISBN-13
+        Image
         
 ## License
 
