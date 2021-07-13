@@ -5,114 +5,127 @@ const fs = require("fs");
 const xlsl = require("xlsx");
 
 var arr = [];
-var isbncount = 0;
+var isbnCount = 0;
+var keyCount = 0;
 
 (async() => {
     fs.createReadStream("data1.csv")
     .pipe(csv())
     .on("data", (row) => {
-      
-      isbncount++
+      isbnCount++
       console.log(row.isbn);
       var isbn = row.isbn;
 
       const url = "https://www.bookdepository.com/search?searchTerm="+isbn+"&search=Find+book"
-      const resultData = bookdepository(url, isbn);
+      const resultData = bookDepository(url, isbn);
       
       var arrayData = resultData.then(function (result){
         arr.push(result);
         return arr
       })
 
-      arrayData.then( function (arrayResult){
-        const wb = xlsl.utils.book_new();
-        const ws = xlsl.utils.json_to_sheet(arrayResult);
-        xlsl.utils.book_append_sheet(wb,ws);
-        xlsl.writeFile(wb,"links.xlsx");
+      fileWrite =  arrayData.then( function (arrayResult){
+        console.log("Writing to file " + arrayResult[keyCount].ISBN + " " + arrayResult[keyCount].Title);
+        const excelResult =  excelWrite(arrayResult);
+        return excelResult;
       })
+
+      fileWrite.then( function(data1) {
+        console.log(data1)
+        keyCount++
+      } )
 
     })
     .on("end", () => {
-      console.log("Total ISBN" + " "+ isbncount);
+      console.log("Total ISBN " + isbnCount);
       console.log("ISBN file successfully processed");
     });
 })();
 
-async function bookdepository(url , isbn){
+async function bookDepository(url , isbn){
   let obj = {};
 
   const objectReturn =  await axios.get(url).then((response) => {
         // Load the web page source code into a cheerio instance
         const $ = cheerio.load(response.data)
 
-        const titleElems = $("*[itemprop = 'name']")[0]
-        const authorElems = $("*[itemprop = 'author']")
-        const descriptionElems = $("*[itemprop = 'description']")
-        const lanaguageElems = $("*[itemprop = 'inLanguage']")
-        const categoryElems =  $('ol.breadcrumb a')[0]
-        const pageElems =  $("*[itemprop = 'numberOfPages']")[0]
-        const publishElems =  $("*[itemprop = 'datePublished']")
-        const publisherElems =  $("*[itemprop = 'publisher']")
-        const imprintElems =  $("ul.biblio-info li ")[4]
-        const typeElems =  $("ul.biblio-info li span")[0]
-        const originElems =  $("ul.biblio-info li")[4]
-        const isbnElems =  $("*[itemprop = 'isbn']")
-        const imageElems =  $(".item-img-content")
+        const titleElem = $("*[itemprop = 'name']")[0]
+        const authorElem = $("*[itemprop = 'author']")[0]
+        const descriptionElem = $("*[itemprop = 'description']")
+        const languageElem = $("*[itemprop = 'inLanguage']")
+        const categoryElem =  $('ol.breadcrumb a')[0]
+        const pageElem =  $("*[itemprop = 'numberOfPages']")[0]
+        const publishElem =  $("*[itemprop = 'datePublished']")
+        const publisherElem =  $("*[itemprop = 'publisher']")
+        const imprintElem =  $("ul.biblio-info li ")[4]
+        const typeElem =  $("ul.biblio-info li span")[0]
+        const originElem =  $("ul.biblio-info li")[4]
+        const isbnElem =  $("*[itemprop = 'isbn']")
+        const imageElem =  $(".item-img-content")
 
-        var titlecontent = $(titleElems).text().trim();
-        var authorcontent = $(authorElems).text().trim();
-        var descriptioncontent = $(descriptionElems).text().trim().replace(/^\s+|\s+$/gm,'');
-        var languagecontent = $(lanaguageElems).text().trim();
-        var categorycontent = $(categoryElems).text().trim().replace(/^\s+|\s+$/gm,'');;
-        var pagecontent = $(pageElems).text().trim();
-        var publishcontent = $(publishElems).text().trim();
-        var publishercontent = $(publisherElems).text().trim();
-        var imagecontent = $(imageElems).find('img').attr('src');
+        var titleContent = $(titleElem).text().trim().toUpperCase();
+        var authorContent = $(authorElem).text().trim().toUpperCase();;
+        var descriptionContent = $(descriptionElem).text().toUpperCase().trim().replace(/^\s+|\s+$/gm,'');
+        var languageContent = $(languageElem).text().trim().toUpperCase();
+        var categoryContent = $(categoryElem).text().trim().toUpperCase().replace(/^\s+|\s+$/gm,'');;
+        var pageContent = $(pageElem).text().trim().toUpperCase();
+        var publishContent = $(publishElem).text().trim().toUpperCase();
+        var publisherContent = $(publisherElem).text().trim().toUpperCase();
+        var imageContent = $(imageElem).find('img').attr('src');
         
-        if($(imprintElems).text().trim().includes("Imprint")){
-          var imprintcontent = $(imprintElems).text().trim().substring(7).replace(/^\s+|\s+$/gm,'');
+        if($(imprintElem).text().trim().includes("Imprint")){
+          var imprintContent = $(imprintElem).text().trim().substring(7).replace(/^\s+|\s+$/gm,'').toUpperCase();
         } else{
-          var imprintcontent = "No information"
+          var imprintContent = "NO INFORMATION"
         }
-        var typecontent = $(typeElems).text().trim().substring(0,10).replace(/^\s+|\s+$/gm,'');
-        var isbncontent = $(isbnElems).text().trim();
-        if($(originElems).text().trim().includes("Publication City/Country")){
-          var origincontent = $(originElems).text().trim().substring(26).replace(/^\s+|\s+$/gm,'');
+        var typeContent = $(typeElem).text().trim().substring(0,10).replace(/^\s+|\s+$/gm,'').toUpperCase();
+        var isbnContent = $(isbnElem).text().trim().toUpperCase();
+        if($(originElem).text().trim().includes("Publication City/Country")){
+          var originContent = $(originElem).text().trim().substring(26).replace(/^\s+|\s+$/gm,'').toUpperCase();
         } else{
-          const originElems =  $("ul.biblio-info li")[5]
-          var origincontent = $(originElems).text().trim().substring(26).replace(/^\s+|\s+$/gm,'');
+          const originElem =  $("ul.biblio-info li")[5]
+          var originContent = $(originElem).text().trim().substring(26).replace(/^\s+|\s+$/gm,'').toUpperCase();
         }
         
         obj["ISBN"] = isbn;
-        obj["Author"] = authorcontent;
-        obj["Title"] = titlecontent;
-        obj["Description"] = descriptioncontent;
-        obj["Language"] = languagecontent;
-        obj["Category"] = categorycontent;
-        obj["Pages"] = pagecontent;
-        obj["Published Date"] = publishcontent;
-        obj["Publisher"] = publishercontent;
-        obj["Type"] = typecontent;
-        obj["ISBN-13"] = isbncontent;
-        obj["Publication City/Country"] = origincontent;
-        obj["Imprint"] = imprintcontent;
-        obj["Image"] = imagecontent;
+        obj["Author"] = authorContent;
+        obj["Title"] = titleContent;
+        obj["Description"] = descriptionContent;
+        obj["Language"] = languageContent;
+        obj["Category"] = categoryContent;
+        obj["Pages"] = pageContent;
+        obj["Published Date"] = publishContent;
+        obj["Publisher"] = publisherContent;
+        obj["Type"] = typeContent;
+        obj["ISBN-13"] = isbnContent;
+        obj["Publication City/Country"] = originContent;
+        obj["Imprint"] = imprintContent;
+        obj["Image"] = imageContent;
 
-        console.log("Title:- " + titlecontent);
-        console.log("Author:- "+ authorcontent)
-        console.log("Description:- "+ descriptioncontent) 
-        console.log("Language:- " + languagecontent)
-        console.log("Category:- " + categorycontent)
-        console.log("Pages:- "+ pagecontent)
-        console.log("Published date:- "+ publishcontent)
-        console.log("Publisher:- "+ publishercontent)
-        console.log("Imprint:- "+ imprintcontent)
-        console.log("Publication City/Country:- "+ origincontent)
-        console.log("Type:- "+ typecontent)
-        console.log("ISBN:- "+ isbncontent)
-        console.log("Image:- "+ imagecontent)
+        // console.log("Title:- " + titleContent);
+        // console.log("Author:- "+ authorContent)
+        // console.log("Description:- "+ descriptionContent) 
+        // console.log("Language:- " + languageContent)
+        // console.log("Category:- " + categoryContent)
+        // console.log("Pages:- "+ pageContent)
+        // console.log("Published date:- "+ publishContent)
+        // console.log("Publisher:- "+ publisherContent)
+        // console.log("Imprint:- "+ imprintContent)
+        // console.log("Publication City/Country:- "+ originContent)
+        // console.log("Type:- "+ typeContent)
+        // console.log("ISBN:- "+ isbnContent)
+        // console.log("Image:- "+ imageContent)
 
         return obj;
       })
       return objectReturn;
+}
+
+async function excelWrite(arrayResult){
+
+  const wb = xlsl.utils.book_new();
+  const ws = xlsl.utils.json_to_sheet(arrayResult);
+  xlsl.utils.book_append_sheet(wb,ws);
+  xlsl.writeFile(wb,"links.xlsx");
+  return "Done";
 }
